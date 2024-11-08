@@ -56,10 +56,12 @@ namespace HotelReservationAPI.Controllers
 
             var userRoles = await _userManager.GetRolesAsync(user);
             var authClaims = new List<Claim>
-        {
-            new Claim(ClaimTypes.Name, user.UserName),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-        };
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id), // user.Id es el userId único
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.Name, user.UserName),
+                new Claim(ClaimTypes.Role, "Customer") // O el rol apropiado
+            };
 
             foreach (var userRole in userRoles)
             {

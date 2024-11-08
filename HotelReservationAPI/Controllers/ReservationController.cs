@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using HotelReservationAPI.Models;
+
 
 namespace HotelReservationAPI.Controllers
 {
@@ -42,16 +44,8 @@ namespace HotelReservationAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> MakeReservation(ReservationRequestDto request)
         {
-            // Obtiene el userId del usuario autenticado
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            if (userId == null)
-            {
-                return Unauthorized("Usuario no autenticado.");
-            }
-
-
-            // Crea la instancia de la reserva usando los datos proporcionados
             var reservation = new Reservation
             {
                 RoomId = request.RoomId,
@@ -60,26 +54,41 @@ namespace HotelReservationAPI.Controllers
                 EndDate = request.EndDate
             };
 
-            // Validación de fechas
-            if (reservation.StartDate < DateTime.Now || (reservation.EndDate - reservation.StartDate).Days > 30)
-            {
-                return BadRequest("Las fechas de reserva no son válidas.");
-            }
-
-            // Guarda la reserva en la base de datos
             _context.Reservations.Add(reservation);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetReservation), new { id = reservation.Id }, reservation);
+            var response = new ReservationResponseDto
+            {
+                Id = reservation.Id,
+                RoomId = reservation.RoomId,
+                UserId = reservation.UserId,
+                StartDate = reservation.StartDate,
+                EndDate = reservation.EndDate
+            };
+
+            var fullReservation = await _context.Reservations
+                .Include(r => r.Room)
+                .Include(r => r.User)
+                .FirstOrDefaultAsync(r => r.Id == reservation.Id);
+
+
+            return CreatedAtAction(nameof(GetReservation), new { id = reservation.Id }, fullReservation);
+
         }
 
         // GET: api/reservations/{id} - Obtener detalles de una reserva específica (disponible para el usuario autenticado)
         [HttpGet("{id}")]
         public async Task<ActionResult<Reservation>> GetReservation(int id)
         {
-            var reservation = await _context.Reservations.FindAsync(id);
+            var reservation = await _context.Reservations
+                .Include(r => r.Room)
+                .Include(r => r.User)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
             if (reservation == null)
+            {
                 return NotFound();
+            }
 
             return Ok(reservation);
         }
@@ -97,6 +106,8 @@ namespace HotelReservationAPI.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
+
+
     }
 
 }
