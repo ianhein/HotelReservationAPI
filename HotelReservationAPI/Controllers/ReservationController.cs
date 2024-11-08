@@ -3,6 +3,7 @@ using HotelReservationAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace HotelReservationAPI.Controllers
 {
@@ -39,16 +40,36 @@ namespace HotelReservationAPI.Controllers
         // POST: api/reservations - Crear una nueva reserva (solo clientes)
         [Authorize(Roles = "Customer")]
         [HttpPost]
-        public async Task<IActionResult> MakeReservation(Reservation reservation)
+        public async Task<IActionResult> MakeReservation(ReservationRequestDto request)
         {
-            if (reservation.StartDate < DateTime.Now)
-                return BadRequest("No se puede reservar en una fecha pasada.");
+            // Obtiene el userId del usuario autenticado
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            if ((reservation.EndDate - reservation.StartDate).Days > 30)
-                return BadRequest("Las reservas no pueden durar más de 30 días.");
+            if (userId == null)
+            {
+                return Unauthorized("Usuario no autenticado.");
+            }
 
+
+            // Crea la instancia de la reserva usando los datos proporcionados
+            var reservation = new Reservation
+            {
+                RoomId = request.RoomId,
+                UserId = userId,
+                StartDate = request.StartDate,
+                EndDate = request.EndDate
+            };
+
+            // Validación de fechas
+            if (reservation.StartDate < DateTime.Now || (reservation.EndDate - reservation.StartDate).Days > 30)
+            {
+                return BadRequest("Las fechas de reserva no son válidas.");
+            }
+
+            // Guarda la reserva en la base de datos
             _context.Reservations.Add(reservation);
             await _context.SaveChangesAsync();
+
             return CreatedAtAction(nameof(GetReservation), new { id = reservation.Id }, reservation);
         }
 
